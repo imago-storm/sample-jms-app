@@ -123,6 +123,8 @@ public class JMSServlet extends HttpServlet {
         QueueReceiver receiver = session.createReceiver(queue);
         SampleListener listener = new SampleListener();
         listener.setPrintWriter(out);
+        out.println("Waiting for messages...");
+        receiver.setMessageListener(listener);
         Thread.sleep(5000);
     }
     
