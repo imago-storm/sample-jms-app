@@ -8,19 +8,20 @@ package com.electriccloud;
 import static com.electriccloud.Constants.*;
 import java.io.IOException;
 import java.io.PrintWriter;
+import javax.jms.*;
+import javax.naming.*;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.naming.*;  
-import javax.jms.*;  
 
 /**
  *
  * @author imago
  */
-public class JMSServlet extends HttpServlet {
-    
+public class JMSTopic extends HttpServlet {
+
+
     /**
      * Processes requests for both HTTP <code>GET</code> and <code>POST</code>
      * methods.
@@ -34,45 +35,39 @@ public class JMSServlet extends HttpServlet {
             throws ServletException, IOException {
         response.setContentType("text/html;charset=UTF-8");
         try (PrintWriter out = response.getWriter()) {
-            String message = request.getParameter("message");
-            if (message == null || message.equals("")) {
-                message = "Sample Message";
-            }
             /* TODO output your page here. You may use following sample code. */
             out.println("<!DOCTYPE html>");
             out.println("<html>");
             out.println("<head>");
-            out.println("<title>Servlet JMSServlet</title>");  
-            String connectionFactoryName = withDefault(request.getParameter(CONNECTION_FACTORY_PARAMETER), CONNECTION_FACTORY);
-            String queueName = withDefault(request.getParameter(QUEUE_PARAMETER), QUEUE);
+            out.println("<title>Servlet JMSTopic</title>");            
             out.println("</head>");
             out.println("<body>");
-            out.println("<h1>Servlet JMSServlet at " + request.getContextPath() + "</h1>");
+            out.println("<h1>Servlet JMSTopic at " + request.getContextPath() + "</h1>");
             out.println("<pre>");
-            String command = request.getParameter("command");
-            if (command == null) {
-                command = "send";
+            String cfName = withDefault(request.getParameter(CONNECTION_FACTORY_PARAMETER), CONNECTION_FACTORY);
+            String topicName = withDefault(request.getParameter(TOPIC_PARAMETER), TOPIC);
+            String command = withDefault(request.getParameter(COMMAND_PARAMETER), "");
+            String message = withDefault(request.getParameter(MESSAGE_PARAMETER), MESSAGE);
+            try {
+                      
+                switch(command) {
+                    case SEND:
+                        sendMessage(out, message, cfName, topicName);
+                        break;
+                    case RECEIVE:
+                        receiveMessage(out, cfName, topicName);
+                        String timeToWait = withDefault(request.getParameter("ttl"), "5000");
+                        Long time = Long.parseLong(timeToWait);
+                        Thread.sleep(time);
+                        break;
+                    default:
+                        receiveMessage(out, cfName, topicName);
+                        sendMessage(out, message, cfName, topicName);
+                        Thread.sleep(5000);
+                }
+            } catch (Throwable e) {
+               e.printStackTrace(out);
             }
-            switch(command) {
-                case "send": 
-                    try {
-                        sendMessage(out, message, connectionFactoryName, queueName);
-                    } catch (Throwable e) {
-                        e.printStackTrace(out);
-                    }
-                
-                    break;
-                case "receive": 
-                    try {
-                        receiveMessage(out, connectionFactoryName, queueName);
-                    } catch (Throwable e) {
-                        e.printStackTrace(out);
-                    }
-                    break;
-                default:
-                    out.println("Don't know command " + command);
-            }
-          
             out.println("</pre>");
             out.println("</body>");
             out.println("</html>");
@@ -80,41 +75,42 @@ public class JMSServlet extends HttpServlet {
     }
     
     
-    void sendMessage(PrintWriter out, String message, String cfName, String queueName) throws NamingException, JMSException {
+    void sendMessage(PrintWriter out, String message, String cfName, String topicName) throws NamingException, JMSException {
         InitialContext ctx = new InitialContext();
-        QueueConnectionFactory f = (QueueConnectionFactory) ctx.lookup(cfName);
-        out.println("Found connection factory " + cfName);
-        QueueConnection conn = f.createQueueConnection();
-        out.println("Created connection...");
-        conn.start();
-        QueueSession session = conn.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
-        Queue queue = (Queue) ctx.lookup(queueName);
-        out.println("Found queue " + queueName);
-        QueueSender sender = session.createSender(queue);
+        out.println("Looking for CF " + cfName);
+        TopicConnectionFactory cf = (TopicConnectionFactory) ctx.lookup(cfName);
+        out.println("Found Connection Factory " + cf.toString());
+        TopicConnection tc = cf.createTopicConnection();
+        tc.start();
+        TopicSession session = tc.createTopicSession(true, Session.AUTO_ACKNOWLEDGE);
+        Topic t = (Topic) ctx.lookup(topicName);
+        out.println("Found topic: " + t.getTopicName());
+        TopicPublisher publisher = session.createPublisher(t);
         TextMessage msg = session.createTextMessage();
         msg.setText(message);
-        sender.send(msg);
-        out.println("Sent message to " + queue.getQueueName());
-        conn.close();
+        publisher.publish(msg, Message.DEFAULT_DELIVERY_MODE, 0, 5000);
+        out.println("Sent message: " + message);
+        System.out.println("Sent message " + message);
+        tc.close();      
     }
     
     
-    void receiveMessage(PrintWriter out, String cfName, String queueName) throws JMSException, NamingException, InterruptedException {
+    void receiveMessage(PrintWriter out, String cfName, String topicName) throws NamingException, JMSException, InterruptedException {
         InitialContext ctx = new InitialContext();
-        QueueConnectionFactory f = (QueueConnectionFactory) ctx.lookup(cfName);
-        QueueConnection conn = f.createQueueConnection();
-        conn.start();
-        QueueSession session = conn.createQueueSession(false, Session.AUTO_ACKNOWLEDGE);
-        Queue queue = (Queue) ctx.lookup(queueName);
-        QueueReceiver receiver = session.createReceiver(queue);
+        out.println("Looking for Connection Factory " + cfName);
+        TopicConnectionFactory cf = (TopicConnectionFactory) ctx.lookup(cfName);
+        out.println("Found Connection Factory " + cf.toString());
+        TopicConnection tc = cf.createTopicConnection();
+        tc.start();
+        TopicSession session = tc.createTopicSession(true, Session.AUTO_ACKNOWLEDGE);
+        Topic t = (Topic) ctx.lookup(topicName);
+        out.println("Found topic: " + t.getTopicName());
+        TopicSubscriber receiver = session.createSubscriber(t);
         SampleListener listener = new SampleListener();
         listener.setPrintWriter(out);
-        out.println("Waiting for messages...");
         receiver.setMessageListener(listener);
-        Thread.sleep(5000);
+        out.println("Subscriber is ready...");
     }
-    
-
 
     // <editor-fold defaultstate="collapsed" desc="HttpServlet methods. Click on the + sign on the left to edit the code.">
     /**

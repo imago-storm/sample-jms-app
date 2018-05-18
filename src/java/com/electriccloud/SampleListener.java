@@ -25,6 +25,7 @@ public class SampleListener implements MessageListener {
         try {
             TextMessage msg = (TextMessage) message;
             out.println("Received message: " + msg.getText());
+            System.out.println("Received Message " + msg.getText());
         } catch (JMSException e) {
             out.println(e.getMessage());
         }

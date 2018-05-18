@@ -76,10 +76,10 @@ public class DemoServlet extends HttpServlet {
         
         Statement stmt = connection.createStatement();
         String table = "TEST_DB.TEST_TABLE";
+        out.println("Querying " + table);
         try {
             stmt.execute("SELECT * FROM " + table);
             ResultSet rs = stmt.getResultSet();
-            out.println("Querying " + table);
             while(rs.next()) {
                 out.println("ID: " + rs.getString("ID"));
             }

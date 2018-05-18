@@ -8,6 +8,10 @@
         <servlet-name>JMSServlet</servlet-name>
         <servlet-class>com.electriccloud.JMSServlet</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>JMSTopic</servlet-name>
+        <servlet-class>com.electriccloud.JMSTopic</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>DemoServlet</servlet-name>
         <url-pattern>/DemoServlet</url-pattern>
@@ -15,6 +19,10 @@
     <servlet-mapping>
         <servlet-name>JMSServlet</servlet-name>
         <url-pattern>/JMSServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>JMSTopic</servlet-name>
+        <url-pattern>/JMSTopic</url-pattern>
     </servlet-mapping>
     <session-config>
         <session-timeout>
